@@ -206,3 +206,103 @@ class ConvolutionalNetwork(nn.Module):
                 pass
 
         self.logit_linear_layer.reset_parameters()
+
+
+class DiegoConvolutionalNetwork(nn.Module):
+    def __init__(self, input_shape, dim_reduction_type, num_output_classes, num_filters, num_layers, use_bias=False):
+        """
+        Initializes a convolutional network module object.
+        :param input_shape: The shape of the inputs going in to the network.
+        :param dim_reduction_type: The type of dimensionality reduction to apply after each convolutional stage, should be one of ['max_pooling', 'avg_pooling', 'strided_convolution', 'dilated_convolution']
+        :param num_output_classes: The number of outputs the network should have (for classification those would be the number of classes)
+        :param num_filters: Number of filters used in every conv layer, except dim reduction stages, where those are automatically infered.
+        :param num_layers: Number of conv layers (excluding dim reduction stages)
+        :param use_bias: Whether our convolutions will use a bias.
+        """
+        super(ConvolutionalNetwork, self).__init__()
+        # set up class attributes useful in building the network and inference
+        self.input_shape = input_shape
+        self.num_filters = num_filters
+        self.num_output_classes = num_output_classes
+        self.use_bias = use_bias
+        self.num_layers = num_layers
+        self.dim_reduction_type = dim_reduction_type
+        # initialize a module dict, which is effectively a dictionary that can collect layers and integrate them into pytorch
+        self.layer_dict = nn.ModuleDict()
+        # build the network
+        self.build_module()
+
+    def build_module(self):
+        """
+        Builds network whilst automatically inferring shapes of layers.
+        """
+        print("Building basic block of ConvolutionalNetwork using input shape", self.input_shape)
+        x = torch.zeros((self.input_shape))  # create dummy inputs to be used to infer shapes of layers
+
+        out = x
+        # torch.nn.Conv2d(in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=True)
+        for i in range(self.num_layers):  # for number of layers times
+            self.layer_dict['conv_{}'.format(i)] = nn.Conv2d(in_channels=out.shape[1],
+                                                             # add a conv layer in the module dict
+                                                             kernel_size=3,
+                                                             out_channels=self.num_filters, padding=1,
+                                                             bias=self.use_bias)
+
+            out = self.layer_dict['conv_{}'.format(i)](out)  # use layer on inputs to get an output
+            out = F.relu(out)  # apply relu
+            print(out.shape)
+
+            self.layer_dict['dim_reduction_max_pool_{}'.format(i)] = nn.MaxPool2d(2, padding=1)
+            out = self.layer_dict['dim_reduction_max_pool_{}'.format(i)](out)
+
+            self.dropout = nn.Dropout(p=0.5)
+            out = self.dropout(out)
+
+            print(out.shape)
+
+        out = out.view(out.shape[0], -1)  # flatten outputs from (b, c, h, w) to (b, c*h*w)
+
+        self.layer_dict['linear_layer_1'] = nn.Linear(in_features=out.shape[1],
+                                            out_features=self.num_output_classes,
+                                            bias=self.use_bias)
+        out = self.layer_dict['linear_layer_1'](out)
+
+        self.layer_dict['linear_layer_2'] = nn.Linear(in_features=out.shape[1],
+                                            out_features=self.num_output_classes,
+                                            bias=self.use_bias)
+        out = self.layer_dict['linear_layer_2'](out)
+
+        print("Block is built, output volume is", out.shape)
+        return out
+
+    def forward(self, x):
+        """
+        Forward propages the network given an input batch
+        :param x: Inputs x (b, c, h, w)
+        :return: preds (b, num_classes)
+        """
+        out = x
+        for i in range(self.num_layers):  # for number of layers
+
+            out = self.layer_dict['conv_{}'.format(i)](out)  # pass through conv layer indexed at i
+            out = F.relu(out)  # pass conv outputs through ReLU
+			out = self.layer_dict['dim_reduction_max_pool_{}'.format(i)](out)
+			out = self.dropout(out)
+
+        out = out.view(out.shape[0], -1)  # flatten outputs from (b, c, h, w) to (b, c*h*w)
+
+        out = self.layer_dict['linear_layer_1'](out)
+        out = self.layer_dict['linear_layer_2'](out)
+        return out
+
+    def reset_parameters(self):
+        """
+        Re-initialize the network parameters.
+        """
+        for item in self.layer_dict.children():
+            try:
+                item.reset_parameters()
+            except:
+                pass
+
+        self.logit_linear_layer.reset_parameters()
