@@ -15,7 +15,7 @@ from storage_utils import save_statistics
 
 class ExperimentBuilder(nn.Module):
     def __init__(self, network_model, experiment_name, num_epochs, train_data, val_data,
-                 test_data, reg_alpha = 0, reg_lambda = 0, weight_decay_coefficient, use_gpu, continue_from_epoch=-1):
+                 test_data, reg_alpha = 0, reg_lambda = 0, weight_decay_coefficient, use_gpu, continue_from_epoch=-1, reg=None):
         """
         Initializes an ExperimentBuilder object. Such an object takes care of running training and evaluation of a deep net
         on a given dataset. It also takes care of saving per epoch models and automatically inferring the best val model
@@ -36,6 +36,7 @@ class ExperimentBuilder(nn.Module):
         self.model = network_model
         self.model.reset_parameters()
         self.device = torch.cuda.current_device()
+        self.reg = reg
 
         if torch.cuda.device_count() > 1 and use_gpu:
             self.device = torch.cuda.current_device()
@@ -146,16 +147,19 @@ class ExperimentBuilder(nn.Module):
 
         out = self.model.forward(x)  # forward the data in the model
         
-        l1_crit = nn.L1Loss(size_average=False)
-        l2_crit = nn.MSELoss(size_average=False)
-        reg_l1 = 0
-        reg_l2 = 0
+        if self.reg == None:
+            loss = F.cross_entropy(input=out, target=y)
+        elif self.reg == 'elastic_net':    
+            l1_crit = nn.L1Loss(size_average=False)
+            l2_crit = nn.MSELoss(size_average=False)
+            reg_l1 = 0
+            reg_l2 = 0
 
-        for param in self.parameters():
-            reg_l1 += l1_crit(param)
-            reg_l2 += l2_crit(param)
+            for param in self.parameters():
+                reg_l1 += l1_crit(param)
+                reg_l2 += l2_crit(param)
             
-        loss = F.cross_entropy(input=out, target=y)  + reg_lambda*((1-reg_alpha)/2*reg_l2 + reg_alpha*reg_l1)# compute loss
+            loss = F.cross_entropy(input=out, target=y)  + reg_lambda*((1-reg_alpha)/2*reg_l2 + reg_alpha*reg_l1)# compute loss
 
         self.optimizer.zero_grad()  # set all weight grads from previous training iters to 0
         loss.backward()  # backpropagate to compute gradients for current iter loss

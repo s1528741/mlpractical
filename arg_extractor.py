@@ -47,6 +47,7 @@ def get_args():
                         help='Weight decay to use for Adam')
     parser.add_argument('--filepath_to_arguments_json_file', nargs="?", type=str, default=None,
                         help='')
+    parser.add_argument('--reg', nargs="?", type=str, default=None, help='regularization type - one of "elastic_net"')
 
     args = parser.parse_args()
 

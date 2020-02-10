@@ -209,14 +209,12 @@ class ConvolutionalNetwork(nn.Module):
 
 
 class DiegoConvolutionalNetwork(nn.Module):
-    def __init__(self, input_shape, dim_reduction_type, num_output_classes, num_filters, num_layers, use_bias=False):
+    def __init__(self, input_shape, num_output_classes, num_filters, use_bias=False):
         """
         Initializes a convolutional network module object.
         :param input_shape: The shape of the inputs going in to the network.
-        :param dim_reduction_type: The type of dimensionality reduction to apply after each convolutional stage, should be one of ['max_pooling', 'avg_pooling', 'strided_convolution', 'dilated_convolution']
         :param num_output_classes: The number of outputs the network should have (for classification those would be the number of classes)
         :param num_filters: Number of filters used in every conv layer, except dim reduction stages, where those are automatically infered.
-        :param num_layers: Number of conv layers (excluding dim reduction stages)
         :param use_bias: Whether our convolutions will use a bias.
         """
         super(ConvolutionalNetwork, self).__init__()
@@ -225,7 +223,7 @@ class DiegoConvolutionalNetwork(nn.Module):
         self.num_filters = num_filters
         self.num_output_classes = num_output_classes
         self.use_bias = use_bias
-        self.num_layers = num_layers
+        self.num_layers = 2
         self.dim_reduction_type = dim_reduction_type
         # initialize a module dict, which is effectively a dictionary that can collect layers and integrate them into pytorch
         self.layer_dict = nn.ModuleDict()
