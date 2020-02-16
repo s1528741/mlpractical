@@ -217,14 +217,13 @@ class DiegoConvolutionalNetwork(nn.Module):
         :param num_filters: Number of filters used in every conv layer, except dim reduction stages, where those are automatically infered.
         :param use_bias: Whether our convolutions will use a bias.
         """
-        super(ConvolutionalNetwork, self).__init__()
+        super(DiegoConvolutionalNetwork, self).__init__()
         # set up class attributes useful in building the network and inference
         self.input_shape = input_shape
         self.num_filters = num_filters
         self.num_output_classes = num_output_classes
         self.use_bias = use_bias
         self.num_layers = 2
-        self.dim_reduction_type = dim_reduction_type
         # initialize a module dict, which is effectively a dictionary that can collect layers and integrate them into pytorch
         self.layer_dict = nn.ModuleDict()
         # build the network
@@ -250,7 +249,7 @@ class DiegoConvolutionalNetwork(nn.Module):
             out = F.relu(out)  # apply relu
             print(out.shape)
 
-            self.layer_dict['dim_reduction_max_pool_{}'.format(i)] = nn.MaxPool2d(2, padding=1)
+            self.layer_dict['dim_reduction_max_pool_{}'.format(i)] = nn.MaxPool2d(2)
             out = self.layer_dict['dim_reduction_max_pool_{}'.format(i)](out)
 
             self.dropout = nn.Dropout(p=0.5)
@@ -261,7 +260,7 @@ class DiegoConvolutionalNetwork(nn.Module):
         out = out.view(out.shape[0], -1)  # flatten outputs from (b, c, h, w) to (b, c*h*w)
 
         self.layer_dict['linear_layer_1'] = nn.Linear(in_features=out.shape[1],
-                                            out_features=self.num_output_classes,
+                                            out_features=32,
                                             bias=self.use_bias)
         out = self.layer_dict['linear_layer_1'](out)
 
@@ -284,8 +283,8 @@ class DiegoConvolutionalNetwork(nn.Module):
 
             out = self.layer_dict['conv_{}'.format(i)](out)  # pass through conv layer indexed at i
             out = F.relu(out)  # pass conv outputs through ReLU
-			out = self.layer_dict['dim_reduction_max_pool_{}'.format(i)](out)
-			out = self.dropout(out)
+            out = self.layer_dict['dim_reduction_max_pool_{}'.format(i)](out)
+            out = self.dropout(out)
 
         out = out.view(out.shape[0], -1)  # flatten outputs from (b, c, h, w) to (b, c*h*w)
 
@@ -302,5 +301,3 @@ class DiegoConvolutionalNetwork(nn.Module):
                 item.reset_parameters()
             except:
                 pass
-
-        self.logit_linear_layer.reset_parameters()
